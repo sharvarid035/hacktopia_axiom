@@ -128,7 +128,7 @@ export default function App() {
   const [testData, setTestData] = useState(null);
   const [verdictData, setVerdictData] = useState(null);
   const [showTestCode, setShowTestCode] = useState(false);
-  const [expandedLog, setExpandedLog] = useState(null);
+  const [expandedCandidate, setExpandedCandidate] = useState(null);
 
   const handleSelectExample = (e) => {
     const selectedId = e.target.value;
@@ -154,7 +154,7 @@ export default function App() {
     setJudgeStarted(false);
     setTestData(null);
     setVerdictData(null);
-    setExpandedLog(null);
+    setExpandedCandidate(null);
 
     try {
       const response = await fetch(`${BACKEND_URL}/debug/stream`, {
@@ -189,6 +189,7 @@ export default function App() {
             setDefenderText((prev) => prev + (data.text || ""));
           } else if (data.agent === "tests") {
             setTestData({
+              mode: data.mode,
               test_code: data.test_code,
               results: data.results,
             });
@@ -249,6 +250,26 @@ export default function App() {
     } finally {
       setIsRunning(false);
     }
+  };
+
+  // Extract unique validated test names
+  const testNames = (() => {
+    if (!testData?.results) return [];
+    const names = new Set();
+    ["original", "prosecutor", "defender"].forEach((cand) => {
+      const perTest = testData.results[cand]?.per_test;
+      if (perTest) {
+        Object.keys(perTest).forEach((n) => names.add(n));
+      }
+    });
+    return Array.from(names);
+  })();
+
+  const renderStatusIcon = (status) => {
+    if (status === "PASSED") return <span className="test-icon pass">✅</span>;
+    if (status === "FAILED") return <span className="test-icon fail">❌</span>;
+    if (status === "ERROR") return <span className="test-icon error">⚠️</span>;
+    return <span className="test-icon neutral">-</span>;
   };
 
   return (
@@ -421,123 +442,91 @@ export default function App() {
         <section className="results-section">
           <div className="section-header">
             <h2 className="section-title">Sandbox Pytest Results</h2>
-            <span className="section-subtitle">Real automated pytest execution in isolated sandbox</span>
+            <span className="section-subtitle">
+              Validated {testNames.length} unit tests in {testData.mode || "function"} mode
+            </span>
           </div>
 
           <div className="table-responsive">
-            <table className="results-table">
+            <table className="results-table per-test-table">
               <thead>
                 <tr>
-                  <th>Agent Candidate</th>
-                  <th>Tests Passed</th>
-                  <th>Pass Rate</th>
-                  <th>Pytest Log</th>
+                  <th>Test Case</th>
+                  <th className="muted-col">Original Code</th>
+                  <th>Prosecutor's Patch</th>
+                  <th>Defender's Patch</th>
                 </tr>
               </thead>
               <tbody>
-                <tr>
+                {testNames.map((tName) => (
+                  <tr key={tName}>
+                    <td className="test-name-cell">
+                      <code>{tName}</code>
+                    </td>
+                    <td className="muted-col">
+                      {renderStatusIcon(testData.results?.original?.per_test?.[tName])}
+                    </td>
+                    <td>
+                      {renderStatusIcon(testData.results?.prosecutor?.per_test?.[tName])}
+                    </td>
+                    <td>
+                      {renderStatusIcon(testData.results?.defender?.per_test?.[tName])}
+                    </td>
+                  </tr>
+                ))}
+                {/* Totals Row */}
+                <tr className="totals-row">
                   <td>
-                    <div className="candidate-cell">
-                      <span className="candidate-dot dot-prosecutor"></span>
-                      <strong>Prosecutor's Patch</strong>
-                    </div>
+                    <strong>Total Passed</strong>
                   </td>
-                  <td>
-                    <span className="score-pill">
-                      {testData.results?.prosecutor?.passed ?? 0} / {testData.results?.prosecutor?.total ?? 0}
+                  <td className="muted-col">
+                    <span className="score-pill muted">
+                      {testData.results?.original?.passed ?? 0} / {testData.results?.original?.total ?? testNames.length}
                     </span>
                   </td>
                   <td>
-                    {(() => {
-                      const passed = testData.results?.prosecutor?.passed ?? 0;
-                      const total = testData.results?.prosecutor?.total ?? 1;
-                      const pct = Math.round((passed / Math.max(1, total)) * 100);
-                      return (
-                        <div className="progress-bar-wrapper">
-                          <div className="progress-bar-bg">
-                            <div
-                              className="progress-bar-fill fill-prosecutor"
-                              style={{ width: `${pct}%` }}
-                            ></div>
-                          </div>
-                          <span className="progress-pct">{pct}%</span>
-                        </div>
-                      );
-                    })()}
-                  </td>
-                  <td>
-                    <button
-                      className="view-log-btn"
-                      onClick={() =>
-                        setExpandedLog(expandedLog === "prosecutor" ? null : "prosecutor")
-                      }
-                    >
-                      {expandedLog === "prosecutor" ? "Hide Output" : "View Output"}
-                    </button>
-                  </td>
-                </tr>
-
-                <tr>
-                  <td>
-                    <div className="candidate-cell">
-                      <span className="candidate-dot dot-defender"></span>
-                      <strong>Defender's Patch</strong>
-                    </div>
-                  </td>
-                  <td>
-                    <span className="score-pill">
-                      {testData.results?.defender?.passed ?? 0} / {testData.results?.defender?.total ?? 0}
+                    <span className="score-pill score-prosecutor">
+                      {testData.results?.prosecutor?.passed ?? 0} / {testData.results?.prosecutor?.total ?? testNames.length}
                     </span>
                   </td>
                   <td>
-                    {(() => {
-                      const passed = testData.results?.defender?.passed ?? 0;
-                      const total = testData.results?.defender?.total ?? 1;
-                      const pct = Math.round((passed / Math.max(1, total)) * 100);
-                      return (
-                        <div className="progress-bar-wrapper">
-                          <div className="progress-bar-bg">
-                            <div
-                              className="progress-bar-fill fill-defender"
-                              style={{ width: `${pct}%` }}
-                            ></div>
-                          </div>
-                          <span className="progress-pct">{pct}%</span>
-                        </div>
-                      );
-                    })()}
-                  </td>
-                  <td>
-                    <button
-                      className="view-log-btn"
-                      onClick={() =>
-                        setExpandedLog(expandedLog === "defender" ? null : "defender")
-                      }
-                    >
-                      {expandedLog === "defender" ? "Hide Output" : "View Output"}
-                    </button>
+                    <span className="score-pill score-defender">
+                      {testData.results?.defender?.passed ?? 0} / {testData.results?.defender?.total ?? testNames.length}
+                    </span>
                   </td>
                 </tr>
               </tbody>
             </table>
           </div>
 
+          {/* Candidate Output Logs Button Strip */}
+          <div className="log-buttons-strip">
+            <span>View Pytest Output:</span>
+            {["original", "prosecutor", "defender"].map((cName) => (
+              <button
+                key={cName}
+                className={`view-log-btn ${expandedCandidate === cName ? "active" : ""}`}
+                onClick={() => setExpandedCandidate(expandedCandidate === cName ? null : cName)}
+              >
+                {cName.charAt(0).toUpperCase() + cName.slice(1)} Log
+              </button>
+            ))}
+          </div>
+
           {/* Expanded Output Details */}
-          {expandedLog && (
+          {expandedCandidate && (
             <div className="log-viewer">
               <div className="log-viewer-header">
                 <span>
-                  Pytest Raw Output ({expandedLog === "prosecutor" ? "Prosecutor" : "Defender"})
+                  Pytest Raw Output ({expandedCandidate.toUpperCase()})
                 </span>
-                <button className="copy-btn" onClick={() => setExpandedLog(null)}>
+                <button className="copy-btn" onClick={() => setExpandedCandidate(null)}>
                   Close
                 </button>
               </div>
               <pre className="log-content">
                 <code>
-                  {expandedLog === "prosecutor"
-                    ? testData.results?.prosecutor?.output || "No output recorded."
-                    : testData.results?.defender?.output || "No output recorded."}
+                  {testData.results?.[expandedCandidate]?.output || "No output recorded."}
                 </code>
               </pre>
             </div>
@@ -551,7 +540,7 @@ export default function App() {
             >
               <span className="accordion-icon">{showTestCode ? "▼" : "▶"}</span>
               <span className="accordion-title">See Judge's Generated Test Code</span>
-              <span className="accordion-badge">5 pytest functions</span>
+              <span className="accordion-badge">{testNames.length} validated pytest tests</span>
             </button>
 
             {showTestCode && (

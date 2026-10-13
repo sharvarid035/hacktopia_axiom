@@ -38,389 +38,420 @@ class CodeRequest(BaseModel):
 def extract_code(text: str) -> str:
     """
     Returns the contents of the first ```python block, or "" if none.
+    Also handles unterminated final ``` fence.
     """
     if not text:
         return ""
-    match = re.search(r"```python\s*\n?(.*?)```", text, re.DOTALL | re.IGNORECASE)
+    # Standard closed block
+    match = re.search(r"```(?:python)?\s*\n?(.*?)```", text, re.DOTALL | re.IGNORECASE)
     if match:
         return match.group(1).strip()
-    match_fallback = re.search(r"```\s*\n?(.*?)```", text, re.DOTALL)
-    if match_fallback:
-        return match_fallback.group(1).strip()
-    match_unclosed = re.search(r"```python\s*\n?(.*)", text, re.DOTALL | re.IGNORECASE)
+    # Unterminated block at end
+    match_unclosed = re.search(r"```(?:python)?\s*\n?(.*)", text, re.DOTALL | re.IGNORECASE)
     if match_unclosed:
-        return match_unclosed.group(1).strip()
+        code_part = match_unclosed.group(1).strip()
+        if code_part:
+            return code_part
     return ""
 
 
-def parse_test_results(code: str, tests: str) -> dict:
+async def call_gemini_with_retry(fn, *args, max_retries: int = 4, **kwargs):
+    """
+    Calls a Gemini async function with up to max_retries retries on 429, 500, or 503 errors
+    with backoff (1s, 2s, 4s).
+    """
+    backoffs = [1, 2, 4, 6]
+    for attempt in range(max_retries + 1):
+        try:
+            return await fn(*args, **kwargs)
+        except Exception as e:
+            err_str = str(e)
+            is_transient = any(code in err_str for code in ["429", "500", "503", "RESOURCE_EXHAUSTED", "UNAVAILABLE", "high demand"])
+            if is_transient and attempt < max_retries:
+                wait_time = backoffs[attempt] if attempt < len(backoffs) else 4
+                print(f"[RETRY] Gemini call failed with {type(e).__name__}: {err_str[:60]}. Retrying in {wait_time}s (attempt {attempt + 1}/{max_retries})...")
+                await asyncio.sleep(wait_time)
+            else:
+                raise e
+
+
+async def stream_with_retry(make_stream_fn, max_retries: int = 4):
+    """
+    Consumes chunks from a stream generator, retrying the whole stream if a transient error occurs mid-stream.
+    Yields chunks.
+    """
+    backoffs = [1, 2, 4, 6]
+    for attempt in range(max_retries + 1):
+        try:
+            stream = await make_stream_fn()
+            async for chunk in stream:
+                yield chunk
+            return
+        except Exception as e:
+            err_str = str(e)
+            is_transient = any(code in err_str for code in ["429", "500", "503", "RESOURCE_EXHAUSTED", "UNAVAILABLE", "high demand"])
+            if is_transient and attempt < max_retries:
+                wait_time = backoffs[attempt] if attempt < len(backoffs) else 4
+                print(f"[RETRY STREAM] Stream failed with {type(e).__name__}: {err_str[:60]}. Retrying in {wait_time}s...")
+                await asyncio.sleep(wait_time)
+            else:
+                raise e
+
+
+
+def run_tests_for_candidate(code: str, test_code: str, mode: str, valid_test_names: list[str]) -> dict:
+    """
+    Executes test_code on candidate code using sandbox.run_in_docker.
+    Filters per_test to valid_test_names, counts passed/total.
+    """
     if not code or not code.strip():
-        expected_tests = len(re.findall(r"def\s+test_", tests)) or 5
+        per_test = {name: "FAILED" for name in valid_test_names}
         return {
             "passed": 0,
-            "total": expected_tests,
+            "total": len(valid_test_names),
+            "per_test": per_test,
             "output": "No code provided to execute.",
         }
 
-    res = sandbox.run_in_docker(code, tests)
-    out = res.get("output", "")
+    res = sandbox.run_in_docker(code, test_code, mode=mode)
+    raw_per_test = res.get("per_test", {})
 
-    passed_match = re.search(r"(\d+)\s+passed", out)
-    failed_match = re.search(r"(\d+)\s+failed", out)
-    error_match = re.search(r"(\d+)\s+error", out)
-
-    passed = int(passed_match.group(1)) if passed_match else 0
-    failed = int(failed_match.group(1)) if failed_match else 0
-    errors = int(error_match.group(1)) if error_match else 0
-
-    total = passed + failed + errors
-    if total == 0:
-        total = len(re.findall(r"def\s+test_", tests)) or 5
+    per_test = {}
+    passed_count = 0
+    for name in valid_test_names:
+        status = raw_per_test.get(name, "FAILED")
+        per_test[name] = status
+        if status == "PASSED":
+            passed_count += 1
 
     return {
-        "passed": passed,
-        "total": total,
-        "output": out,
+        "passed": passed_count,
+        "total": len(valid_test_names),
+        "per_test": per_test,
+        "output": res.get("output", ""),
     }
 
 
-def get_fallback_knowledge(code: str):
+def filter_test_code_to_names(full_test_code: str, valid_names: set[str]) -> str:
     """
-    Provides curated fallback agent responses for common patterns and the 3 preloaded examples
-    if the external Gemini API quota is temporarily exhausted during demoing.
+    Extracts only the pytest test functions matching valid_names.
     """
-    code_clean = code.strip()
+    func_pattern = re.compile(r"(def\s+(test_[a-zA-Z0-9_]+)\s*\([^)]*\):(?:\n(?:[ \t]+[^\n]*|\s*))*)", re.MULTILINE)
+    matches = func_pattern.findall(full_test_code)
 
-    # Example 1: average of empty list
-    if "average" in code_clean or "len(nums)" in code_clean:
-        p_text = (
-            "The `average` function crashes with a `ZeroDivisionError` when given an empty list.\n\n"
-            "**WHERE it fails:** `len(nums)` in the denominator.\n"
-            "**WHY it fails:** When `nums` is `[]`, `len(nums)` is 0, and division by zero is undefined.\n"
-            "**Example trigger:** `average([])` raises `ZeroDivisionError`.\n\n"
-            "```python\n"
-            "def average(nums):\n"
-            "    if not nums:\n"
-            "        return 0\n"
-            "    return sum(nums) / len(nums)\n"
-            "```"
-        )
-        d_text = (
-            "VERDICT: CHALLENGE\n"
-            "The Prosecutor's fix returns `0` for an empty list, but returning 0 masks missing data and implies a computed mean of zero. "
-            "Raising a `ValueError` is clearer, prevents silent downstream data corruption, and informs the caller explicitly.\n\n"
-            "```python\n"
-            "def average(nums):\n"
-            "    if not nums:\n"
-            "        raise ValueError(\"Cannot calculate average of an empty list.\")\n"
-            "    return sum(nums) / len(nums)\n"
-            "```"
-        )
-        tests = (
-            "import pytest\n"
-            "from solution import *\n\n"
-            "def test_average_positive():\n"
-            "    assert average([1, 2, 3]) == 2.0\n\n"
-            "def test_average_negative():\n"
-            "    assert average([-1, -2, -3]) == -2.0\n\n"
-            "def test_average_mixed():\n"
-            "    assert average([-2, 0, 2]) == 0.0\n\n"
-            "def test_average_single():\n"
-            "    assert average([42]) == 42.0\n\n"
-            "def test_average_large():\n"
-            "    assert average([1000000, 2000000, 3000000]) == 2000000.0\n"
-        )
-        return p_text, d_text, tests
+    kept_funcs = []
+    for full_func, func_name in matches:
+        if func_name in valid_names:
+            kept_funcs.append(full_func.strip())
 
-    # Example 2: off-by-one loop
-    if "find_element" in code_clean or "len(items) + 1" in code_clean:
-        p_text = (
-            "The `find_element` function fails with an `IndexError` due to an off-by-one loop boundary.\n\n"
-            "**WHERE it fails:** `range(len(items) + 1)` in the for-loop header.\n"
-            "**WHY it fails:** In Python, valid indices range from `0` to `len(items) - 1`. Iterating to `len(items)` accesses past the list end.\n"
-            "**Example trigger:** `find_element([10, 20], 30)` attempts `items[2]`.\n\n"
-            "```python\n"
-            "def find_element(items, target):\n"
-            "    for i in range(len(items)):\n"
-            "        if items[i] == target:\n"
-            "            return i\n"
-            "    return -1\n"
-            "```"
-        )
-        d_text = (
-            "VERDICT: CHALLENGE\n"
-            "Direct index indexing (`items[i]`) is unpythonic and prone to bugs on custom iterables. "
-            "Using `enumerate(items)` avoids manual index arithmetic, improves readability, and runs faster.\n\n"
-            "```python\n"
-            "def find_element(items, target):\n"
-            "    for i, val in enumerate(items):\n"
-            "        if val == target:\n"
-            "            return i\n"
-            "    return -1\n"
-            "```"
-        )
-        tests = (
-            "import pytest\n"
-            "from solution import *\n\n"
-            "def test_find_first_item():\n"
-            "    assert find_element([10, 20, 30], 10) == 0\n\n"
-            "def test_find_last_item():\n"
-            "    assert find_element([10, 20, 30], 30) == 2\n\n"
-            "def test_find_not_found():\n"
-            "    assert find_element([10, 20, 30], 99) == -1\n\n"
-            "def test_find_empty_list():\n"
-            "    assert find_element([], 5) == -1\n\n"
-            "def test_find_duplicate():\n"
-            "    assert find_element([7, 7, 7], 7) == 0\n"
-        )
-        return p_text, d_text, tests
+    return "\n\n".join(kept_funcs)
 
-    # Example 3: mutable default argument
-    if "append_to_list" in code_clean or "my_list=[]" in code_clean:
-        p_text = (
-            "The `append_to_list` function suffers from the classic Python mutable default argument defect.\n\n"
-            "**WHERE it fails:** `my_list=[]` in the function parameter definition.\n"
-            "**WHY it fails:** Default values are evaluated once at function definition. All calls omitting the argument share the exact same list instance.\n"
-            "**Example trigger:** Successive calls `append_to_list(1)` and `append_to_list(2)` accumulate into `[1, 2]`.\n\n"
-            "```python\n"
-            "def append_to_list(val, my_list=None):\n"
-            "    if my_list is None:\n"
-            "        my_list = []\n"
-            "    my_list.append(val)\n"
-            "    return my_list\n"
-            "```"
-        )
-        d_text = (
-            "VERDICT: CONCEDE\n"
-            "The Prosecutor's fix using `None` as the default sentinel value is the idiomatic Python design pattern. "
-            "It guarantees that each caller receives a fresh list instance while still accepting an optional user-supplied list.\n"
-            "Edge cases handled: subsequent calls remain independent, and pre-existing lists are safely modified."
-        )
-        tests = (
-            "import pytest\n"
-            "from solution import *\n\n"
-            "def test_append_single():\n"
-            "    assert append_to_list(1) == [1]\n\n"
-            "def test_append_isolation():\n"
-            "    # Second call must not retain item from first call\n"
-            "    assert append_to_list(2) == [2]\n\n"
-            "def test_append_existing():\n"
-            "    assert append_to_list(3, [1, 2]) == [1, 2, 3]\n\n"
-            "def test_append_string():\n"
-            "    assert append_to_list('x') == ['x']\n\n"
-            "def test_append_none():\n"
-            "    assert append_to_list(None) == [None]\n"
-        )
-        return p_text, d_text, tests
 
-    # Generic fallback
-    fn_name_match = re.search(r"def\s+([a-zA-Z_0-9]+)\s*\(", code)
-    fn_name = fn_name_match.group(1) if fn_name_match else "solution"
-    p_text = (
-        f"The function `{fn_name}` has potential edge-case failures with empty inputs or boundary values.\n"
-        "Ensure edge checks are verified before processing.\n\n"
-        f"```python\n{code_clean}\n```"
-    )
-    d_text = (
-        "VERDICT: CONCEDE\n"
-        "The logic is reasonable. Ensure inputs are validated and types match expected arguments."
-    )
-    tests = (
-        "import pytest\n"
-        "from solution import *\n\n"
-        f"def test_{fn_name}_basic():\n"
-        "    assert True\n\n"
-        f"def test_{fn_name}_empty():\n"
-        "    assert True\n\n"
-        f"def test_{fn_name}_edge():\n"
-        "    assert True\n\n"
-        f"def test_{fn_name}_large():\n"
-        "    assert True\n\n"
-        f"def test_{fn_name}_negative():\n"
-        "    assert True\n"
-    )
-    return p_text, d_text, tests
+def get_active_model() -> str:
+    """
+    Selects gemini-2.5-flash by default, or auto-falls back to available flash models
+    (gemini-3.1-flash-lite, gemini-3.8-flash) if 2.5-flash is retired (404) or experiencing spikes (503).
+    """
+    configured = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    candidates = [configured, "gemini-3.1-flash-lite", "gemini-3.8-flash"]
+    for cand in candidates:
+        try:
+            client.models.generate_content(model=cand, contents="test")
+            return cand
+        except Exception as e:
+            err = str(e).lower()
+            if any(k in err for k in ["404", "no longer available", "not found", "503", "unavailable"]):
+                continue
+            return cand
+    return "gemini-3.1-flash-lite"
+
 
 
 @app.post("/debug/stream")
 async def swarm_debug_stream(request: CodeRequest):
     async def event_generator():
         original_code = request.code
-        model_name = "gemini-2.5-flash"
-        config = types.GenerateContentConfig(
-            thinking_config=types.ThinkingConfig(thinking_budget=0),
-            max_output_tokens=1500,
+        model_name = get_active_model()
+        agent_config = types.GenerateContentConfig(
+            temperature=0.3,
+            max_output_tokens=4096,
+            thinking_config=types.ThinkingConfig(thinking_budget=512),
         )
 
         try:
+            # ==========================================
             # 1. PROSECUTOR AGENT
+            # ==========================================
             yield f"data: {json.dumps({'agent': 'status', 'text': 'Prosecutor is analyzing the code...'})}\n\n"
             prosecutor_prompt = (
                 "You are the Prosecutor Agent. Your audience is a beginner who has never seen this code.\n"
-                "Explain the bugs in the Python code in simple English without unexplained jargon (under 120 words).\n"
-                "Say WHERE the code fails and WHY it fails, including a tiny real example input that triggers the failure.\n"
-                "Then provide your COMPLETE corrected code in one ```python fenced code block.\n\n"
-                f"Code:\n{original_code}"
+                "Your task is to find GENUINE bugs in the Python code below. If the code is already correct, say so plainly (\"No bugs found\") and return the ORIGINAL code unchanged. NEVER invent bugs.\n"
+                "If there is a bug:\n"
+                "- Explain WHERE and WHY it fails in simple, everyday English (under 120 words).\n"
+                "- Include one concrete failing input that triggers the bug.\n"
+                "- Then give the COMPLETE corrected program in exactly one ```python fenced code block.\n"
+                "The fix must preserve the original program's intended behavior and structure (a script stays a script, a function keeps its name and signature).\n\n"
+                f"User's Code:\n{original_code}"
             )
 
             prosecutor_output = ""
-            fallback_p, fallback_d, fallback_tests = get_fallback_knowledge(original_code)
 
-            try:
-                response = await client.aio.models.generate_content_stream(
-                    model=model_name, contents=prosecutor_prompt, config=config
+            async def stream_prosecutor():
+                return await client.aio.models.generate_content_stream(
+                    model=model_name, contents=prosecutor_prompt, config=agent_config
                 )
-                async for chunk in response:
-                    text = chunk.text or ""
-                    if not text:
-                        continue
-                    prosecutor_output += text
-                    yield f"data: {json.dumps({'agent': 'prosecutor', 'text': text})}\n\n"
-            except Exception as e:
-                # If Gemini quota exceeded or unavailable, stream high-quality fallback chunks
-                words = fallback_p.split(" ")
-                for i in range(0, len(words), 3):
-                    chunk = " ".join(words[i:i+3]) + (" " if i+3 < len(words) else "")
-                    prosecutor_output += chunk
-                    yield f"data: {json.dumps({'agent': 'prosecutor', 'text': chunk})}\n\n"
-                    await asyncio.sleep(0.04)
+
+            async for chunk in stream_with_retry(stream_prosecutor):
+                text = chunk.text or ""
+                if not text:
+                    continue
+                prosecutor_output += text
+                yield f"data: {json.dumps({'agent': 'prosecutor', 'text': text})}\n\n"
+
+            print(f"[PROSECUTOR RAW OUTPUT]: {prosecutor_output[:100]}...")
+
+            prosecutor_code = extract_code(prosecutor_output)
+            # If no code was extracted, execute repair call
+            if not prosecutor_code:
+                repair_prompt = (
+                    "Return ONLY the complete corrected Python code in one ```python block for the following task/explanation:\n\n"
+                    f"Code:\n{original_code}\n\n"
+                    f"Explanation:\n{prosecutor_output}"
+                )
+                repair_resp = await call_gemini_with_retry(
+                    client.aio.models.generate_content,
+                    model=model_name,
+                    contents=repair_prompt,
+                    config=agent_config,
+                )
+                repair_text = repair_resp.text or ""
+                prosecutor_code = extract_code(repair_text) or repair_text.strip()
+                if repair_text:
+                    append_chunk = f"\n\n```python\n{prosecutor_code}\n```"
+                    yield f"data: {json.dumps({'agent': 'prosecutor', 'text': append_chunk})}\n\n"
 
             # DELAY BEFORE DEFENDER (0.5s)
             yield f"data: {json.dumps({'agent': 'status', 'text': 'Defender is getting ready...'})}\n\n"
             await asyncio.sleep(0.5)
 
+            # ==========================================
             # 2. DEFENDER AGENT
+            # ==========================================
             defender_prompt = (
-                "You are the Defender Agent. Your audience is a beginner who has never seen this code.\n"
-                "Respond directly to the Prosecutor's explanation and fix for the original code.\n"
-                "Your response MUST start on the very first line with exactly one of these two verdicts:\n"
-                "VERDICT: CONCEDE\n"
-                "or\n"
-                "VERDICT: CHALLENGE\n\n"
-                "Instructions:\n"
-                "- If you choose 'VERDICT: CONCEDE': The prosecutor's fix is correct, so just list 2-3 edge cases it must still handle in simple words.\n"
-                "- If you choose 'VERDICT: CHALLENGE': Explain edge cases where the prosecutor's fix fails (under 120 words), then give the COMPLETE improved code in one ```python fenced block.\n\n"
+                "You are the Defender Agent. You are reviewing the Prosecutor's proposed fix for the code.\n"
+                "Mentally execute the Prosecutor's code on edge cases (empty input, zero, negatives, very large values, wrong types, whitespace, etc. — whatever fits the program).\n"
+                "Your very first line MUST be exactly \"VERDICT: CONCEDE\" or \"VERDICT: CHALLENGE\".\n\n"
+                "- If CONCEDE: The Prosecutor's code is correct. Briefly list the edge cases that were checked and why they pass (under 120 words). Do not provide code; your fix will equal the prosecutor's code.\n"
+                "- If CHALLENGE: Name the SPECIFIC edge case input where the Prosecutor's code fails and why (be concrete, never vague, under 120 words). Then provide a COMPLETE improved program in one ```python block that fixes it without breaking the original behavior.\n\n"
+                "Do NOT challenge just for the sake of arguing. If the Prosecutor is right, concede.\n\n"
                 f"Original Code:\n{original_code}\n\n"
-                f"Prosecutor's Response:\n{prosecutor_output}"
+                f"Prosecutor's Explanation:\n{prosecutor_output}\n\n"
+                f"Prosecutor's Fixed Code:\n{prosecutor_code}"
             )
 
             defender_output = ""
-            try:
-                response = await client.aio.models.generate_content_stream(
-                    model=model_name, contents=defender_prompt, config=config
+
+            async def stream_defender():
+                return await client.aio.models.generate_content_stream(
+                    model=model_name, contents=defender_prompt, config=agent_config
                 )
-                async for chunk in response:
-                    text = chunk.text or ""
-                    if not text:
-                        continue
-                    defender_output += text
-                    yield f"data: {json.dumps({'agent': 'defender', 'text': text})}\n\n"
-            except Exception as e:
-                words = fallback_d.split(" ")
-                for i in range(0, len(words), 3):
-                    chunk = " ".join(words[i:i+3]) + (" " if i+3 < len(words) else "")
-                    defender_output += chunk
-                    yield f"data: {json.dumps({'agent': 'defender', 'text': chunk})}\n\n"
-                    await asyncio.sleep(0.04)
 
-            # DELAY BEFORE JUDGE (0.5s)
-            yield f"data: {json.dumps({'agent': 'status', 'text': 'Judge is evaluating both sides...'})}\n\n"
-            await asyncio.sleep(0.5)
+            async for chunk in stream_with_retry(stream_defender):
+                text = chunk.text or ""
+                if not text:
+                    continue
+                defender_output += text
+                yield f"data: {json.dumps({'agent': 'defender', 'text': text})}\n\n"
 
-            # Extract codes
-            prosecutor_code = extract_code(prosecutor_output)
+            print(f"[DEFENDER RAW OUTPUT]: {defender_output[:100]}...")
+
             first_line = defender_output.strip().splitlines()[0] if defender_output.strip() else ""
             if "CONCEDE" in first_line.upper():
                 defender_code = prosecutor_code
             else:
                 defender_code = extract_code(defender_output)
+                if not defender_code:
+                    repair_prompt = (
+                        "Return ONLY the complete improved Python code in one ```python block for the following challenge:\n\n"
+                        f"Explanation:\n{defender_output}"
+                    )
+                    repair_resp = await call_gemini_with_retry(
+                        client.aio.models.generate_content,
+                        model=model_name,
+                        contents=repair_prompt,
+                        config=agent_config,
+                    )
+                    repair_text = repair_resp.text or ""
+                    defender_code = extract_code(repair_text) or prosecutor_code
+                    if repair_text:
+                        append_chunk = f"\n\n```python\n{defender_code}\n```"
+                        yield f"data: {json.dumps({'agent': 'defender', 'text': append_chunk})}\n\n"
 
+            # DELAY BEFORE JUDGE (0.5s)
+            yield f"data: {json.dumps({'agent': 'status', 'text': 'Judge is generating and validating test suite...'})}\n\n"
+            await asyncio.sleep(0.5)
+
+            # ==========================================
             # 3. JUDGE STAGE
-            # a. Ask Gemini (non-streaming) to write 5 pytest test functions
-            test_prompt = (
-                "You are the Judge Agent writing unit tests for Python code.\n"
-                "Write 5 pytest test functions, plain asserts only, that test the ORIGINAL code's intended behavior including edge cases (empty input, negatives, large values, etc.).\n"
-                "Output only one ```python block containing the tests. Tests may use `from solution import *`.\n\n"
+            # ==========================================
+            judge_schema = {
+                "type": "OBJECT",
+                "properties": {
+                    "mode": {"type": "STRING", "enum": ["function", "script"]},
+                    "reference_code": {"type": "STRING"},
+                    "tests": {"type": "STRING"},
+                },
+                "required": ["mode", "reference_code", "tests"],
+            }
+            judge_gen_config = types.GenerateContentConfig(
+                temperature=0.0,
+                response_mime_type="application/json",
+                response_schema=judge_schema,
+            )
+
+            test_gen_prompt = (
+                "You are the Judge Agent creating an automated pytest test harness.\n"
+                "Analyze the user's ORIGINAL code to deduce what it was clearly trying to do.\n"
+                "Return a JSON object with:\n"
+                "1. \"mode\": \"script\" if the code prints/reads input at top level (e.g. Hello World, top-level print loops); \"function\" if it defines functions or classes.\n"
+                "2. \"reference_code\": Your OWN completely correct implementation of what the original code intended to do.\n"
+                "3. \"tests\": 5-6 pytest test functions (plain asserts only, no external libraries) covering standard and edge cases.\n"
+                "   - If function mode: tests import nothing (harness prepends 'from solution import *') and call the functions directly with asserts.\n"
+                "   - If script mode: tests use helper `run_solution(stdin_text=\"\")` which returns `(stdout, returncode)`. Assert on stdout (using .strip() or expected content) and returncode == 0. Do NOT import solution in script mode.\n\n"
                 f"Original Code:\n{original_code}"
             )
 
-            test_code = ""
-            try:
-                test_resp = await client.aio.models.generate_content(
-                    model=model_name, contents=test_prompt, config=config
+            async def generate_judge_tests():
+                resp = await client.aio.models.generate_content(
+                    model=model_name,
+                    contents=test_gen_prompt,
+                    config=judge_gen_config,
                 )
-                test_raw = test_resp.text or ""
-                test_code = extract_code(test_raw) or test_raw
-            except Exception:
-                test_code = fallback_tests
+                return json.loads(resp.text)
 
-            # b. Run prosecutor and defender through real sandbox
-            prosecutor_results = await asyncio.to_thread(parse_test_results, prosecutor_code, test_code)
-            defender_results = await asyncio.to_thread(parse_test_results, defender_code, test_code)
+            parsed_judge = await call_gemini_with_retry(generate_judge_tests)
+            mode = parsed_judge.get("mode", "function")
+            reference_code = parsed_judge.get("reference_code", "")
+            raw_tests = parsed_judge.get("tests", "")
 
-            # c. Yield tests event
-            yield f"data: {json.dumps({'agent': 'tests', 'test_code': test_code, 'results': {'prosecutor': prosecutor_results, 'defender': defender_results}})}\n\n"
+            print(f"[JUDGE TEST PLAN] mode: {mode}, raw test length: {len(raw_tests)}")
 
-            # d. Compute winner in Python
-            p_passed = prosecutor_results["passed"]
-            d_passed = defender_results["passed"]
+            # Validate tests against reference_code
+            ref_result = await asyncio.to_thread(sandbox.run_in_docker, reference_code, raw_tests, mode)
+            ref_per_test = ref_result.get("per_test", {})
+            valid_test_names = [name for name, status in ref_per_test.items() if status == "PASSED"]
 
-            if p_passed > d_passed:
+            print(f"[VALIDATION ON REFERENCE] Passed {len(valid_test_names)} tests: {valid_test_names}")
+
+            # If fewer than 3 valid tests remain, regenerate once
+            if len(valid_test_names) < 3:
+                print("[VALIDATION WARNING] Fewer than 3 valid tests. Regenerating once...")
+                parsed_judge = await call_gemini_with_retry(generate_judge_tests)
+                mode = parsed_judge.get("mode", "function")
+                reference_code = parsed_judge.get("reference_code", "")
+                raw_tests = parsed_judge.get("tests", "")
+                ref_result = await asyncio.to_thread(sandbox.run_in_docker, reference_code, raw_tests, mode)
+                ref_per_test = ref_result.get("per_test", {})
+                valid_test_names = [name for name, status in ref_per_test.items() if status == "PASSED"]
+
+            if len(valid_test_names) < 3:
+                raise RuntimeError(f"Judge test generation failed validation: only {len(valid_test_names)} valid tests found.")
+
+            # Filter test code to only validated tests
+            validated_test_code = filter_test_code_to_names(raw_tests, set(valid_test_names))
+            if not validated_test_code.strip():
+                validated_test_code = raw_tests
+
+            # Run validated tests concurrently across original, prosecutor, defender
+            original_task = asyncio.to_thread(run_tests_for_candidate, original_code, validated_test_code, mode, valid_test_names)
+            prosecutor_task = asyncio.to_thread(run_tests_for_candidate, prosecutor_code, validated_test_code, mode, valid_test_names)
+            defender_task = asyncio.to_thread(run_tests_for_candidate, defender_code, validated_test_code, mode, valid_test_names)
+
+            orig_results, pros_results, def_results = await asyncio.gather(original_task, prosecutor_task, defender_task)
+
+            print(f"[TEST RESULTS] Original: {orig_results['passed']}/{len(valid_test_names)}, Prosecutor: {pros_results['passed']}/{len(valid_test_names)}, Defender: {def_results['passed']}/{len(valid_test_names)}")
+
+            # Emit tests SSE event
+            tests_event_data = {
+                "agent": "tests",
+                "mode": mode,
+                "test_code": validated_test_code,
+                "results": {
+                    "original": orig_results,
+                    "prosecutor": pros_results,
+                    "defender": def_results,
+                },
+            }
+            yield f"data: {json.dumps(tests_event_data)}\n\n"
+
+            # Compute winner in Python
+            p_pass = pros_results["passed"]
+            d_pass = def_results["passed"]
+            if p_pass > d_pass:
                 winner = "Prosecutor"
-                reason = f"Prosecutor won by passing {p_passed} of {prosecutor_results['total']} tests while Defender passed {d_passed} of {defender_results['total']} tests."
-            elif d_passed > p_passed:
+            elif d_pass > p_pass:
                 winner = "Defender"
-                reason = f"Defender won by passing {d_passed} of {defender_results['total']} tests while Prosecutor passed {p_passed} of {prosecutor_results['total']} tests."
             else:
                 winner = "Tie"
-                reason = f"Both Prosecutor and Defender passed {p_passed} of {prosecutor_results['total']} test cases."
 
-            yield f"data: {json.dumps({'agent': 'verdict', 'winner': winner, 'reason': reason})}\n\n"
-
-            # e. Stream short beginner-friendly Judge explanation (under 100 words)
-            judge_prompt = (
-                "You are the Judge Agent. Your audience is a beginner who has never seen this code.\n"
-                "Based on the real pytest execution results below, provide a short, beginner-friendly explanation (under 100 words) of why the winner won or why it was a tie.\n"
-                "Be completely honest about the real test results and explain which edge cases mattered.\n\n"
-                f"Original Code Intent:\n{original_code}\n\n"
-                f"Prosecutor Fix:\n{prosecutor_code}\n"
-                f"Prosecutor Results: {p_passed}/{prosecutor_results['total']} passed\n\n"
-                f"Defender Fix:\n{defender_code}\n"
-                f"Defender Results: {d_passed}/{defender_results['total']} passed\n\n"
-                f"Verdict: Winner is {winner}. Reason: {reason}"
+            # Ask Judge LLM for an honest explanation and 1-line reason based on the REAL test execution
+            judge_eval_prompt = (
+                "You are the Judge Agent giving your official verdict on the debugging trial.\n"
+                "Your audience is a beginner who has never seen this code.\n"
+                "Based on the REAL automated pytest execution results below, explain why the winner won or why it was a tie in under 120 words.\n"
+                "- Name specific test cases that passed or failed.\n"
+                "- If both Prosecutor and Defender wrote working fixes and tied, state that honestly.\n"
+                "- Your FIRST sentence must be a concise, one-sentence summary of the decision (e.g. 'Both candidates tied by passing all edge-case tests.').\n\n"
+                f"Mode: {mode}\n"
+                f"Validated Test Cases: {', '.join(valid_test_names)}\n"
+                f"Original Code ({orig_results['passed']}/{len(valid_test_names)} passed):\n{orig_results['per_test']}\n\n"
+                f"Prosecutor Fix ({pros_results['passed']}/{len(valid_test_names)} passed):\n{pros_results['per_test']}\nFailure output: {pros_results['output'][:400] if pros_results['passed'] < len(valid_test_names) else 'None'}\n\n"
+                f"Defender Fix ({def_results['passed']}/{len(valid_test_names)} passed):\n{def_results['per_test']}\nFailure output: {def_results['output'][:400] if def_results['passed'] < len(valid_test_names) else 'None'}\n\n"
+                f"Calculated Winner: {winner}"
             )
 
-            judge_output = ""
-            try:
-                judge_response = await client.aio.models.generate_content_stream(
-                    model=model_name, contents=judge_prompt, config=config
+            judge_full_text = ""
+
+            async def stream_judge():
+                return await client.aio.models.generate_content_stream(
+                    model=model_name, contents=judge_eval_prompt, config=agent_config
                 )
-                async for chunk in judge_response:
-                    text = chunk.text or ""
-                    if not text:
-                        continue
-                    judge_output += text
-                    yield f"data: {json.dumps({'agent': 'judge', 'text': text})}\n\n"
-            except Exception:
-                judge_explanation = (
-                    f"**Verdict:** {winner}! "
-                    f"Both candidates were tested against 5 rigorous unit tests in our sandbox. "
-                    f"{'Both passed all edge cases cleanly, proving equally viable solutions.' if winner == 'Tie' else f'The {winner} proved superior by handling critical edge conditions where the other failed.'} "
-                    f"Real sandbox execution confirmed {p_passed}/{prosecutor_results['total']} passed for Prosecutor and {d_passed}/{defender_results['total']} for Defender."
-                )
-                words = judge_explanation.split(" ")
-                for i in range(0, len(words), 3):
-                    chunk = " ".join(words[i:i+3]) + (" " if i+3 < len(words) else "")
-                    yield f"data: {json.dumps({'agent': 'judge', 'text': chunk})}\n\n"
-                    await asyncio.sleep(0.04)
+
+            # Retrieve one-line reason first or use stream's first sentence
+            # To ensure the verdict reason is LLM-derived, do a quick one-sentence summary call or grab stream
+            verdict_reason_prompt = (
+                f"Given that the calculated winner is {winner} with Prosecutor passing {p_pass}/{len(valid_test_names)} tests and Defender passing {d_pass}/{len(valid_test_names)} tests, "
+                "write exactly ONE plain sentence explaining the reason for this outcome."
+            )
+            reason_resp = await call_gemini_with_retry(
+                client.aio.models.generate_content,
+                model=model_name,
+                contents=verdict_reason_prompt,
+                config=types.GenerateContentConfig(temperature=0.2, max_output_tokens=100),
+            )
+            verdict_reason = reason_resp.text.strip().replace("\n", " ") if reason_resp.text else f"{winner} selected based on pytest test score ({p_pass} vs {d_pass})."
+
+            # Emit verdict event
+            yield f"data: {json.dumps({'agent': 'verdict', 'winner': winner, 'reason': verdict_reason})}\n\n"
+
+            # Stream Judge explanation
+            async for chunk in stream_with_retry(stream_judge):
+                text = chunk.text or ""
+                if not text:
+                    continue
+                judge_full_text += text
+                yield f"data: {json.dumps({'agent': 'judge', 'text': text})}\n\n"
+
+            print(f"[JUDGE RAW VERDICT]: {verdict_reason} | Full: {judge_full_text[:80]}...")
 
             # FINISHED
             yield f"data: {json.dumps({'agent': 'status', 'text': 'Done'})}\n\n"
 
         except Exception as e:
-            yield f"data: {json.dumps({'agent': 'error', 'text': str(e)})}\n\n"
+            err_msg = str(e)
+            print(f"[STREAM ERROR]: {err_msg}")
+            yield f"data: {json.dumps({'agent': 'error', 'text': err_msg})}\n\n"
 
-    # Returns the continuous text/event-stream response
     return StreamingResponse(
         event_generator(),
         media_type="text/event-stream",
