@@ -1,0 +1,57 @@
+:root {
+  --bg-primary: #090d16;
+  --bg-secondary: #0f172a;
+  --bg-card: rgba(18, 26, 44, 0.75);
+  --bg-card-hover: rgba(24, 35, 58, 0.85);
+  --bg-code: #0b1120;
+  
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-active: rgba(255, 255, 255, 0.16);
+  
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  
+  --color-prosecutor: #f43f5e;
+  --color-prosecutor-glow: rgba(244, 63, 94, 0.25);
+  --color-defender: #38bdf8;
+  --color-defender-glow: rgba(56, 189, 248, 0.25);
+  --color-judge: #fbbf24;
+  --color-judge-glow: rgba(251, 191, 36, 0.25);
+  --color-success: #10b981;
+  --color-error: #ef4444;
+
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--bg-primary);
+  background-image: 
+    radial-gradient(circle at 15% 15%, rgba(56, 189, 248, 0.05) 0%, transparent 40%),
+    radial-gradient(circle at 85% 20%, rgba(244, 63, 94, 0.05) 0%, transparent 40%),
+    radial-gradient(circle at 50% 80%, rgba(251, 191, 36, 0.04) 0%, transparent 50%);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  line-height: 1.6;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+}
+
+textarea, select {
+  font-family: inherit;
+}
