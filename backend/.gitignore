@@ -1,0 +1,35 @@
+# Environment variables and API secrets (CRITICAL)
+.env
+.env.local
+*.env
+
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Pytest / Test run artifacts (generated during sandbox runs)
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Virtual Environments
+venv/
+.venv/
+env/
+ENV/
+
+# Temporary files created by execution sandboxes
+tmp/
+temp/
+*.tmp
+
+# Operating system files
+.DS_Store
+Thumbs.db
+
+# IDE and editor settings
+.vscode/
+.idea/
+*.swp
+*.swo

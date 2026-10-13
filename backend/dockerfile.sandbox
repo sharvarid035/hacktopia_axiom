@@ -1,0 +1,21 @@
+# Use a lightweight Python base image
+FROM python:3.11-slim
+
+# Prevent Python from writing .pyc files and enable unbuffered logging
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# Install pytest for test execution
+RUN pip install --no-cache-dir pytest
+
+# Create an unprivileged user for security isolation
+RUN useradd -m -u 1000 sandboxuser
+
+# Set working directory
+WORKDIR /home/sandboxuser/app
+
+# Switch to the non-root user
+USER sandboxuser
+
+# Default command runs pytest with short tracebacks
+CMD ["pytest", "-v", "--tb=short"]
