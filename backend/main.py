@@ -19,6 +19,12 @@ load_dotenv()
 
 app = FastAPI(title="Swarm Debugger API")
 
+
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}
+
+
 # Fix CORS: allow_origins=["*"], allow_credentials=False
 app.add_middleware(
     CORSMiddleware,
@@ -55,24 +61,45 @@ def extract_code(text: str) -> str:
     return ""
 
 
+
 async def call_gemini_with_retry(fn, *args, max_retries: int = 4, **kwargs):
-    """
-    Calls a Gemini async function with up to max_retries retries on 429, 500, or 503 errors
-    with backoff (1s, 2s, 4s).
-    """
+    """Retry transient Gemini errors, but fail fast on exhausted quota."""
     backoffs = [1, 2, 4, 6]
+
     for attempt in range(max_retries + 1):
         try:
             return await fn(*args, **kwargs)
         except Exception as e:
             err_str = str(e)
-            is_transient = any(code in err_str for code in ["429", "500", "503", "RESOURCE_EXHAUSTED", "UNAVAILABLE", "high demand"])
+            is_quota_exhausted = (
+                "RESOURCE_EXHAUSTED" in err_str
+                or "generate_content_free_tier_requests" in err_str
+                or "GenerateRequestsPerDayPerModel" in err_str
+                or "GenerateRequestsPerDayPerProjectPerModel" in err_str
+            )
+
+            if is_quota_exhausted:
+                print("[GEMINI QUOTA] Quota exhausted; stopping retries.")
+                raise RuntimeError(
+                    "Gemini API quota exhausted. Please check your quota "
+                    "and billing details, or retry when the quota resets."
+                ) from e
+
+            is_transient = any(
+                code in err_str
+                for code in ["429", "500", "503", "UNAVAILABLE", "high demand"]
+            )
+
             if is_transient and attempt < max_retries:
-                wait_time = backoffs[attempt] if attempt < len(backoffs) else 4
-                print(f"[RETRY] Gemini call failed with {type(e).__name__}: {err_str[:60]}. Retrying in {wait_time}s (attempt {attempt + 1}/{max_retries})...")
+                wait_time = backoffs[min(attempt, len(backoffs) - 1)]
+                print(
+                    f"[RETRY] Temporary Gemini error. Retrying in "
+                    f"{wait_time}s (attempt {attempt + 1}/{max_retries})..."
+                )
                 await asyncio.sleep(wait_time)
             else:
-                raise e
+                raise
+
 
 
 async def stream_with_retry(make_stream_fn, max_retries: int = 4):
