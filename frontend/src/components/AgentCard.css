@@ -1,0 +1,270 @@
+.agent-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  height: 100%;
+  min-height: 380px;
+  background-color: var(--surface);
+  transition: transform var(--transition-normal), box-shadow var(--transition-normal), border-color var(--transition-normal);
+}
+
+/* Top colored accent bars */
+.agent-card-accent-bar {
+  height: 4px;
+  width: 100%;
+}
+
+.bar-prosecutor {
+  background: linear-gradient(90deg, var(--prosecutor), rgba(232, 64, 79, 0.4));
+}
+
+.bar-defender {
+  background: linear-gradient(90deg, var(--defender), rgba(176, 90, 90, 0.4));
+}
+
+.bar-judge {
+  background: linear-gradient(90deg, var(--judge), rgba(43, 108, 184, 0.4));
+}
+
+/* Active Glows */
+.agent-card.agent-prosecutor.is-active {
+  box-shadow: var(--shadow-glow-prosecutor), var(--shadow-md);
+  border-color: var(--prosecutor-border);
+}
+
+.agent-card.agent-defender.is-active {
+  box-shadow: var(--shadow-glow-defender), var(--shadow-md);
+  border-color: var(--defender-border);
+}
+
+.agent-card.agent-judge.is-active {
+  box-shadow: var(--shadow-glow-judge), var(--shadow-md);
+  border-color: var(--judge-border);
+}
+
+/* Header */
+.agent-card-header {
+  padding: 18px 20px 14px 20px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.agent-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.agent-icon-box {
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.box-prosecutor {
+  background-color: var(--prosecutor-soft);
+  color: var(--prosecutor);
+}
+
+.box-defender {
+  background-color: var(--defender-soft);
+  color: var(--defender);
+}
+
+.box-judge {
+  background-color: var(--judge-soft);
+  color: var(--judge);
+}
+
+.agent-title-meta {
+  display: flex;
+  flex-direction: column;
+}
+
+.agent-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.agent-name {
+  font-family: var(--font-serif);
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.15;
+}
+
+.agent-tagline {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* Defender Decision Badge */
+.defender-decision-pill {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+}
+
+.defender-decision-pill.conceded {
+  background-color: var(--success-soft);
+  color: var(--success);
+  border: 1px solid rgba(30, 142, 90, 0.3);
+}
+
+.defender-decision-pill.challenged {
+  background-color: var(--warning-soft);
+  color: var(--warning);
+  border: 1px solid rgba(217, 119, 6, 0.3);
+}
+
+/* Status Chip */
+.agent-status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 600;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  background-color: var(--surface-subtle);
+  color: var(--text-muted);
+}
+
+.chip-thinking {
+  background-color: var(--primary-soft);
+  color: var(--primary);
+  border-color: var(--primary-border);
+}
+
+.status-thinking {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.thinking-dots {
+  display: flex;
+  gap: 3px;
+}
+
+.thinking-dots .dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background-color: currentColor;
+  animation: pulse-dot 1.2s infinite ease-in-out;
+}
+
+.thinking-dots .dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.thinking-dots .dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+.chip-speaking {
+  background-color: var(--surface-elevated);
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
+.speaking-pulse {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--primary);
+  box-shadow: 0 0 6px var(--primary);
+}
+
+.chip-done {
+  background-color: var(--success-soft);
+  color: var(--success);
+  border-color: rgba(30, 142, 90, 0.25);
+}
+
+.status-done {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Card Body */
+.agent-card-body {
+  padding: 18px 20px;
+  flex: 1;
+  overflow-y: auto;
+  font-size: 0.92rem;
+  line-height: 1.6;
+}
+
+.agent-empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 160px;
+  color: var(--text-muted);
+  font-style: italic;
+  font-size: 0.88rem;
+  text-align: center;
+}
+
+.agent-thinking-state {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 12px 0;
+}
+
+.thinking-skeleton-pulse {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.skeleton-line {
+  height: 12px;
+  border-radius: 4px;
+  background-color: var(--surface-subtle);
+  animation: skeletonPulse 1.5s ease-in-out infinite;
+}
+
+.skeleton-line.full { width: 100%; }
+.skeleton-line.long { width: 85%; }
+.skeleton-line.medium { width: 60%; }
+
+@keyframes skeletonPulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.8; }
+}
+
+.thinking-subtext {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.agent-streamed-content {
+  color: var(--text-body);
+}
+
+.agent-paragraphs p {
+  margin-bottom: 0.85rem;
+}

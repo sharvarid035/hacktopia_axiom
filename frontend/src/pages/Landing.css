@@ -1,0 +1,213 @@
+.landing-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background-color: var(--bg);
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* Minimal Topbar */
+.landing-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 36px;
+  position: relative;
+  z-index: 10;
+}
+
+.landing-brand-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.court-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: var(--primary);
+  box-shadow: 0 0 6px var(--primary);
+}
+
+.landing-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.landing-launch-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 0.88rem;
+  font-weight: 600;
+  transition: all var(--transition-fast);
+}
+
+.landing-launch-btn:hover {
+  background-color: var(--surface-subtle);
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
+}
+
+/* Main Hero */
+.landing-hero {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 30px 24px 50px 24px;
+  text-align: center;
+  position: relative;
+  z-index: 5;
+  max-width: 900px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.landing-logo-block {
+  margin-bottom: 24px;
+}
+
+.landing-content-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.landing-headline {
+  font-family: var(--font-serif);
+  font-size: clamp(2.2rem, 5vw, 3.4rem);
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  margin-bottom: 16px;
+  max-width: 780px;
+}
+
+.headline-italic {
+  font-style: italic;
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.landing-subtitle {
+  font-size: clamp(1rem, 2vw, 1.18rem);
+  color: var(--text-muted);
+  max-width: 620px;
+  line-height: 1.6;
+  margin-bottom: 32px;
+}
+
+.landing-cta-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 48px;
+}
+
+.landing-main-cta {
+  padding: 13px 28px;
+  font-size: 1rem;
+}
+
+.landing-secondary-cta {
+  padding: 12px 24px;
+  font-size: 1rem;
+}
+
+/* Agent preview cards row */
+.landing-agent-preview-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+  width: 100%;
+  max-width: 780px;
+}
+
+.landing-agent-card {
+  padding: 18px 20px;
+  text-align: left;
+  border-radius: var(--radius-lg);
+  border-top: 3px solid var(--agent-color);
+  animation: fadeInStagger 0.6s ease-out both;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.landing-agent-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lg);
+}
+
+.preview-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.preview-icon-box {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  background-color: var(--agent-bg);
+  color: var(--agent-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.preview-agent-name {
+  font-family: var(--font-serif);
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--text);
+}
+
+.preview-agent-role {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+  margin: 0;
+}
+
+/* Footer */
+.landing-footer {
+  padding: 24px;
+  text-align: center;
+  border-top: 1px solid var(--border);
+  position: relative;
+  z-index: 10;
+}
+
+.footer-credits {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+@media (max-width: 768px) {
+  .landing-topbar {
+    padding: 16px 20px;
+  }
+  .landing-agent-preview-row {
+    grid-template-columns: 1fr;
+  }
+}

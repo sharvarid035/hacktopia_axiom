@@ -1,0 +1,130 @@
+.verdict-winner-banner {
+  position: relative;
+  margin-top: 28px;
+  padding: 24px 28px;
+  border-radius: var(--radius-lg);
+  background-color: var(--winner-bg);
+  border: 2px solid var(--winner-color);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08), 0 0 20px var(--winner-color);
+  overflow: hidden;
+  animation: celebrate-pop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.winner-content-wrap {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.winner-icon-bubble {
+  position: relative;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background-color: var(--surface);
+  border: 2px solid var(--winner-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.winner-main-icon {
+  color: var(--winner-color);
+}
+
+.trophy-badge-icon {
+  position: absolute;
+  bottom: -4px;
+  right: -4px;
+  background-color: #F59E0B;
+  color: #FFFFFF;
+  border-radius: 50%;
+  padding: 2px;
+}
+
+.winner-text-block {
+  flex: 1;
+}
+
+.winner-eyebrow-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.winner-eyebrow-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  background-color: var(--winner-color);
+  color: #FFFFFF;
+}
+
+.official-ruling-tag {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.winner-headline {
+  font-family: var(--font-serif);
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.15;
+  margin-bottom: 6px;
+}
+
+.winner-reason-text {
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--text-body);
+  margin: 0;
+}
+
+/* CSS Celebration sparkles */
+.celebration-sparkles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.sparkle {
+  position: absolute;
+  color: var(--winner-color);
+  font-size: 1.2rem;
+  opacity: 0.7;
+  animation: sparkleTwinkle 2.5s infinite ease-in-out;
+}
+
+.sparkle.s1 { top: 12%; right: 15%; animation-delay: 0.2s; }
+.sparkle.s2 { top: 70%; right: 8%; animation-delay: 0.7s; }
+.sparkle.s3 { bottom: 20%; left: 35%; animation-delay: 1.1s; }
+.sparkle.s4 { top: 18%; left: 60%; animation-delay: 1.6s; }
+
+@keyframes sparkleTwinkle {
+  0%, 100% {
+    transform: scale(0.6) rotate(0deg);
+    opacity: 0.3;
+  }
+  50% {
+    transform: scale(1.2) rotate(45deg);
+    opacity: 1;
+  }
+}
+
+@media (max-width: 600px) {
+  .winner-content-wrap {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
