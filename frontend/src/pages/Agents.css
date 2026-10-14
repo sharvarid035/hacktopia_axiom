@@ -1,0 +1,183 @@
+.agents-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 32px 28px 60px 28px;
+}
+
+.agents-header-block {
+  margin-bottom: 36px;
+}
+
+.agents-heading {
+  font-family: var(--font-serif);
+  font-size: clamp(2rem, 4vw, 2.8rem);
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+
+.agents-subheading {
+  font-size: 1rem;
+  color: var(--text-muted);
+  max-width: 650px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.bench-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+
+.bench-agent-card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--radius-xl);
+  transition: transform var(--transition-normal), box-shadow var(--transition-normal);
+}
+
+.bench-agent-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+}
+
+.bench-card-accent-bar {
+  height: 4px;
+  width: 100%;
+  background-color: var(--agent-color);
+}
+
+.bench-card-header {
+  padding: 22px 22px 16px 22px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.bench-header-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.bench-icon-box {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  background-color: var(--agent-soft);
+  color: var(--agent-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.bench-title-meta {
+  display: flex;
+  flex-direction: column;
+}
+
+.bench-agent-name {
+  font-family: var(--font-serif);
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.1;
+}
+
+.bench-agent-role {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--agent-color);
+  margin-top: 2px;
+}
+
+.bench-card-body {
+  padding: 22px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.bench-description {
+  font-size: 0.92rem;
+  line-height: 1.6;
+  color: var(--text-body);
+  margin-bottom: 20px;
+}
+
+.bench-responsibilities {
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 1px dashed var(--border);
+}
+
+.resp-title {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+
+.resp-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.resp-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: var(--text-body);
+  line-height: 1.45;
+}
+
+.resp-check-icon {
+  color: var(--success);
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+
+.bench-card-footer {
+  padding: 14px 22px;
+  background-color: var(--surface-subtle);
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.78rem;
+}
+
+.engine-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+}
+
+.engine-icon {
+  color: var(--text-muted);
+}
+
+.temp-badge {
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+}
+
+@media (max-width: 1024px) {
+  .bench-cards-grid {
+    grid-template-columns: 1fr;
+  }
+}

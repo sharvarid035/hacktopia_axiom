@@ -1,0 +1,327 @@
+.new-trial-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 32px 28px 60px 28px;
+}
+
+.trial-header-block {
+  margin-bottom: 28px;
+}
+
+.trial-title-action-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.trial-heading {
+  font-family: var(--font-serif);
+  font-size: clamp(1.8rem, 3.5vw, 2.5rem);
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.2;
+  margin-bottom: 8px;
+}
+
+.trial-subheading {
+  font-size: 0.95rem;
+  color: var(--text-muted);
+  max-width: 680px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.new-trial-reset-btn {
+  padding: 8px 16px;
+  font-size: 0.88rem;
+  border-radius: var(--radius-md);
+  white-space: nowrap;
+}
+
+/* Error Alert */
+.trial-error-alert {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 18px;
+  border-radius: var(--radius-md);
+  background-color: var(--error-soft);
+  border: 1px solid rgba(220, 38, 38, 0.3);
+  color: var(--error);
+  margin-bottom: 24px;
+  animation: fadeInStagger 0.25s ease-out;
+}
+
+.alert-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.alert-icon {
+  flex-shrink: 0;
+}
+
+.alert-text-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.alert-title {
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.alert-message {
+  font-size: 0.84rem;
+  color: var(--text-body);
+  margin: 2px 0 0 0;
+}
+
+.alert-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.retry-btn {
+  background-color: var(--surface);
+  color: var(--error);
+  border-color: rgba(220, 38, 38, 0.3);
+  font-weight: 600;
+}
+
+.alert-dismiss-btn {
+  color: var(--text-muted);
+  padding: 4px 8px;
+  font-size: 0.9rem;
+}
+
+.alert-dismiss-btn:hover {
+  color: var(--text);
+}
+
+/* Petition Card (Editor View) */
+.petition-card {
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  margin-bottom: 24px;
+}
+
+.petition-card-header {
+  padding: 18px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+  gap: 16px;
+  background-color: var(--surface);
+}
+
+.petition-header-left {
+  display: flex;
+  flex-direction: column;
+}
+
+.petition-card-title {
+  font-family: var(--font-serif);
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.petition-tagline {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.petition-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.python-version-tag {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--judge);
+  background-color: var(--judge-soft);
+  border: 1px solid var(--judge-border);
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+}
+
+.example-dropdown-wrap {
+  position: relative;
+}
+
+.example-select {
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background-color: var(--surface-subtle);
+  color: var(--text);
+  cursor: pointer;
+  outline: none;
+  transition: all var(--transition-fast);
+}
+
+.example-select:hover {
+  border-color: var(--border-strong);
+  background-color: var(--surface-elevated);
+}
+
+/* Editor Wrapper */
+.petition-editor-wrapper {
+  display: flex;
+  min-height: 280px;
+  max-height: 520px;
+  background-color: var(--code-bg);
+  position: relative;
+  overflow: hidden;
+}
+
+.petition-line-numbers {
+  display: flex;
+  flex-direction: column;
+  padding: 16px 12px 16px 16px;
+  text-align: right;
+  color: var(--gutter-color);
+  font-family: var(--font-mono);
+  font-size: 0.88rem;
+  line-height: 1.6;
+  user-select: none;
+  border-right: 1px solid var(--code-border);
+  min-width: 44px;
+  overflow-y: hidden;
+}
+
+.petition-textarea {
+  flex: 1;
+  padding: 16px 18px;
+  background: transparent;
+  color: var(--code-text);
+  font-family: var(--font-mono);
+  font-size: 0.88rem;
+  line-height: 1.6;
+  border: none;
+  outline: none;
+  resize: vertical;
+  overflow-y: auto;
+  white-space: pre;
+  tab-size: 4;
+}
+
+.petition-textarea::placeholder {
+  color: var(--gutter-color);
+  font-style: italic;
+}
+
+/* Petition Footer */
+.petition-card-footer {
+  padding: 16px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid var(--border);
+  background-color: var(--surface);
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.petition-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.hint-bullet {
+  color: var(--primary);
+  font-size: 0.75rem;
+}
+
+.convene-cta-btn {
+  padding: 11px 24px;
+  font-size: 0.95rem;
+}
+
+/* Perspectives Row */
+.perspectives-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 14px 20px;
+}
+
+.perspectives-label {
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.perspective-chips {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.perspective-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+}
+
+.perspective-chip.prosecutor {
+  color: var(--prosecutor);
+  background-color: var(--prosecutor-soft);
+}
+
+.perspective-chip.defender {
+  color: var(--defender);
+  background-color: var(--defender-soft);
+}
+
+.perspective-chip.judge {
+  color: var(--judge);
+  background-color: var(--judge-soft);
+}
+
+.perspective-sep {
+  color: var(--border-strong);
+  font-size: 0.85rem;
+}
+
+/* Trial Live Grid */
+.agent-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+@media (max-width: 1024px) {
+  .agent-cards-grid {
+    grid-template-columns: 1fr;
+  }
+  .new-trial-page {
+    padding: 24px 16px;
+  }
+}
