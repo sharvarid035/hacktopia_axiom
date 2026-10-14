@@ -134,17 +134,41 @@ def run_tests_for_candidate(code: str, test_code: str, mode: str, valid_test_nam
 
 def filter_test_code_to_names(full_test_code: str, valid_names: set[str]) -> str:
     """
-    Extracts only the pytest test functions matching valid_names.
+    Extract complete pytest test functions matching valid_names.
+    Preserves multiline bodies and blank lines.
     """
-    func_pattern = re.compile(r"(def\s+(test_[a-zA-Z0-9_]+)\s*\([^)]*\):(?:\n(?:[ \t]+[^\n]*|\s*))*)", re.MULTILINE)
-    matches = func_pattern.findall(full_test_code)
-
+    lines = full_test_code.splitlines()
     kept_funcs = []
-    for full_func, func_name in matches:
-        if func_name in valid_names:
-            kept_funcs.append(full_func.strip())
+    current_func = []
+    current_name = None
+
+    for line in lines:
+        # A new top-level function starts at column zero.
+        if line.startswith("def test_") or line.startswith("async def test_"):
+            if current_func and current_name in valid_names:
+                kept_funcs.append("\n".join(current_func).rstrip())
+
+            match = re.match(r"(?:async\s+)?def\s+(test_[A-Za-z0-9_]+)\s*\(", line)
+            current_name = match.group(1) if match else None
+            current_func = [line]
+        elif current_func:
+            # Stop at the next top-level definition or class.
+            if line and not line[0].isspace() and (
+                line.startswith("def ") or line.startswith("async def ")
+                or line.startswith("class ")
+            ):
+                if current_name in valid_names:
+                    kept_funcs.append("\n".join(current_func).rstrip())
+                current_func = []
+                current_name = None
+            else:
+                current_func.append(line)
+
+    if current_func and current_name in valid_names:
+        kept_funcs.append("\n".join(current_func).rstrip())
 
     return "\n\n".join(kept_funcs)
+
 
 
 def get_active_model() -> str:
@@ -360,7 +384,10 @@ async def swarm_debug_stream(request: CodeRequest):
             # Filter test code to only validated tests
             validated_test_code = filter_test_code_to_names(raw_tests, set(valid_test_names))
             if not validated_test_code.strip():
-                validated_test_code = raw_tests
+                raise RuntimeError(
+                    "Judge test validation failed: "
+                    "could not extract the validated tests."
+    )
 
             # Run validated tests concurrently across original, prosecutor, defender
             original_task = asyncio.to_thread(run_tests_for_candidate, original_code, validated_test_code, mode, valid_test_names)
