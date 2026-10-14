@@ -1,15 +1,20 @@
 import { ShieldAlert, Scale, Gavel, Clock, CheckCircle2 } from 'lucide-react';
 import './Stepper.css';
 
-export default function Stepper({ currentStep, statusText, isRunning, isDone, elapsedTime }) {
-  // Steps: 1: Prosecutor, 2: Defender, 3: Judge
-  // currentStep can be 0 (Ready), 1 (Prosecutor), 2 (Defender), 3 (Judge), 4 (Complete)
-  const steps = [
-    { id: 1, name: 'Prosecutor', role: 'Finds Flaws', icon: ShieldAlert, colorVar: '--prosecutor' },
-    { id: 2, name: 'Defender', role: 'Tests Fixes', icon: Scale, colorVar: '--defender' },
-    { id: 3, name: 'Judge', role: 'Adjudicates', icon: Gavel, colorVar: '--judge' },
-  ];
+const DEFAULT_STEPS = [
+  { id: 1, name: 'Prosecutor', role: 'Finds Flaws', icon: ShieldAlert, colorVar: '--prosecutor' },
+  { id: 2, name: 'Defender', role: 'Tests Fixes', icon: Scale, colorVar: '--defender' },
+  { id: 3, name: 'Judge', role: 'Adjudicates', icon: Gavel, colorVar: '--judge' },
+];
 
+export default function Stepper({
+  currentStep,
+  statusText,
+  isRunning,
+  isDone,
+  elapsedTime,
+  stages = DEFAULT_STEPS,
+}) {
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -19,7 +24,7 @@ export default function Stepper({ currentStep, statusText, isRunning, isDone, el
   return (
     <div className="stepper-container card-surface">
       <div className="stepper-track">
-        {steps.map((s, idx) => {
+        {stages.map((s, idx) => {
           const Icon = s.icon;
           const isActive = currentStep === s.id;
           const isPassed = currentStep > s.id || isDone;
@@ -48,7 +53,7 @@ export default function Stepper({ currentStep, statusText, isRunning, isDone, el
                 </div>
               </div>
 
-              {idx < steps.length - 1 && (
+              {idx < stages.length - 1 && (
                 <div
                   className={`stepper-connector ${currentStep > s.id || isDone ? 'filled' : ''}`}
                 />

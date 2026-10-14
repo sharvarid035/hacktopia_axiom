@@ -6,6 +6,7 @@ export default function TopBar({ onOpenMobileMenu }) {
   const location = useLocation();
 
   const getPageTitle = (path) => {
+    if (path === '/app/repo') return 'Repo audit';
     if (path === '/app/agents') return 'Agents';
     if (path === '/app/history') return 'Case history';
     return 'New trial';

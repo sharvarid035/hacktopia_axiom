@@ -1,11 +1,21 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Trash2, Clock, Calendar, ArrowRight, ShieldAlert, Scale, Handshake, Code } from 'lucide-react';
+import {
+  Trash2,
+  Clock,
+  Calendar,
+  ArrowRight,
+  ShieldAlert,
+  Scale,
+  Handshake,
+  Code,
+  FolderGit2,
+} from 'lucide-react';
 import './History.css';
 
 const HISTORY_STORAGE_KEY = 'verdict_ai_case_history';
 
-export default function History({ swarmState }) {
+export default function History({ swarmState, repoState }) {
   const [historyList, setHistoryList] = useState(() => {
     try {
       const stored = localStorage.getItem(HISTORY_STORAGE_KEY);
@@ -28,7 +38,10 @@ export default function History({ swarmState }) {
   };
 
   const handleSelectTrial = (trial) => {
-    if (swarmState?.loadPastTrial) {
+    if (trial.type === 'repo' && repoState?.loadPastAudit) {
+      repoState.loadPastAudit(trial);
+      navigate('/app/repo');
+    } else if (swarmState?.loadPastTrial) {
       swarmState.loadPastTrial(trial);
       navigate('/app');
     }
@@ -49,7 +62,13 @@ export default function History({ swarmState }) {
     }
   };
 
-  const getFirstCodeLine = (code) => {
+  const getFirstCodeLine = (trial) => {
+    if (trial.type === 'repo') {
+      const suspectFile = trial.suspect?.file || 'Suspect file';
+      const suspectSha = trial.suspect?.short_sha || '';
+      return `${trial.repo || trial.repoUrl} — ${suspectFile} ${suspectSha ? `(${suspectSha})` : ''}`;
+    }
+    const code = trial.code;
     if (!code) return 'No code recorded';
     const lines = code.trim().split('\n');
     for (const l of lines) {
@@ -121,7 +140,7 @@ export default function History({ swarmState }) {
           </div>
           <h2 className="empty-title">No trials conducted yet</h2>
           <p className="empty-subtext">
-            Submit a code snippet on the New Trial page to convene the court. Your case records and sandboxed verdicts will appear here automatically.
+            Submit a code snippet or audit a GitHub repository to convene the court. Your case records and sandboxed verdicts will appear here automatically.
           </p>
           <button
             type="button"
@@ -134,44 +153,66 @@ export default function History({ swarmState }) {
         </div>
       ) : (
         <div className="history-list">
-          {historyList.map((trial) => (
-            <div
-              key={trial.id}
-              className="history-card card-surface"
-              onClick={() => handleSelectTrial(trial)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  handleSelectTrial(trial);
-                }
-              }}
-            >
-              <div className="history-card-main">
-                <div className="history-meta-row">
-                  <div className="meta-timestamp">
-                    <Calendar size={13} />
-                    <span>{formatDate(trial.timestamp)}</span>
+          {historyList.map((trial) => {
+            const isRepoAudit = trial.type === 'repo';
+
+            return (
+              <div
+                key={trial.id}
+                className={`history-card card-surface ${isRepoAudit ? 'is-repo-card' : ''}`}
+                onClick={() => handleSelectTrial(trial)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    handleSelectTrial(trial);
+                  }
+                }}
+              >
+                <div className="history-card-main">
+                  <div className="history-meta-row">
+                    {isRepoAudit ? (
+                      <span className="history-type-badge repo">
+                        <FolderGit2 size={12} />
+                        <span>Repo: {trial.repo || 'Repository'}</span>
+                      </span>
+                    ) : (
+                      <span className="history-type-badge snippet">
+                        <Code size={12} />
+                        <span>Snippet</span>
+                      </span>
+                    )}
+
+                    <div className="meta-timestamp">
+                      <Calendar size={13} />
+                      <span>{formatDate(trial.timestamp)}</span>
+                    </div>
+                    <div className="meta-duration">
+                      <Clock size={13} />
+                      <span>{trial.duration}s duration</span>
+                    </div>
+                    {renderWinnerBadge(trial.winner)}
                   </div>
-                  <div className="meta-duration">
-                    <Clock size={13} />
-                    <span>{trial.duration}s duration</span>
+
+                  <div className="history-code-preview">
+                    {isRepoAudit ? (
+                      <FolderGit2 size={15} className="code-icon repo-icon" />
+                    ) : (
+                      <Code size={15} className="code-icon" />
+                    )}
+                    <code className="code-snippet-line">{getFirstCodeLine(trial)}</code>
                   </div>
-                  {renderWinnerBadge(trial.winner)}
                 </div>
 
-                <div className="history-code-preview">
-                  <Code size={15} className="code-icon" />
-                  <code className="code-snippet-line">{getFirstCodeLine(trial.code)}</code>
+                <div className="history-card-action">
+                  <span className="reopen-label">
+                    {isRepoAudit ? 'Reopen Audit' : 'Reopen Trial'}
+                  </span>
+                  <ArrowRight size={16} className="reopen-arrow" />
                 </div>
               </div>
-
-              <div className="history-card-action">
-                <span className="reopen-label">Reopen Trial</span>
-                <ArrowRight size={16} className="reopen-arrow" />
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

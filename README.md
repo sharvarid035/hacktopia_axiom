@@ -112,22 +112,41 @@ npm run lint
     - **Prominent Winner Banner**: Celebratory styling with official ruling reason and winner accent colors.
     - Automatic persistence to local storage history on completion.
 
+- **`/app/repo` — Repo Audit Page**:
+  - Full-repository AI code audit powered by GitHub API and GitHub Actions integration.
+  - Paste any public (or token-authenticated private) GitHub repository URL.
+  - Interactive controls: target branch, number of recent commits (3, 5, 10), and optional GitHub personal access token (used strictly per-request, never persisted).
+  - **Commit Timeline**: Displays recent commits with author, relative date, diff stats (`+N / -N`), and GitHub Actions CI badges (*Passing*, *Failing*, *No CI*).
+  - **Investigator Suspect Callout**: Identifies the suspect commit and file, showing confidence level, rationale, and CI diagnostic excerpt.
+  - Full three-agent adjudication court (**Prosecutor**, **Defender**, **Judge**) with sandbox verification on the suspect file.
+
 - **`/app/agents` — The Review Bench**:
   - Overview of Prosecutor (*"Finds the flaw"*), Defender (*"Tests the fix"*), and Judge (*"Scores the case"*).
   - Model engine specifications (Gemini Flash), temperature settings, and core mandate checklists with green *"Ready"* status indicators.
 
 - **`/app/history` — Case History Docket**:
   - Docket archive of all past completed trials stored in `localStorage`.
-  - Date, duration, winner badges, and code snippets.
-  - Click to reopen any past trial directly in the Trial View with complete results.
+  - Distinguishes snippet trials and repository audits with dedicated badges (*Repo* vs *Snippet*).
+  - Date, duration, winner badges, and code/suspect file snippets.
+  - Click to reopen any past trial or repo audit directly in its respective view with complete results.
   - Clear history action and friendly empty state.
 
 ---
 
 ## Example Usage with cURL
 
+### 1. Single Code Snippet Stream (`/debug/stream`)
 ```bash
 curl -N -X POST http://127.0.0.1:8000/debug/stream \
   -H "Content-Type: application/json" \
   -d '{"code":"def average(nums):\n    return sum(nums) / len(nums)"}'
 ```
+
+### 2. Repository Audit Stream (`/debug/repo/stream`)
+```bash
+curl -N -X POST http://127.0.0.1:8000/debug/repo/stream \
+  -H "Content-Type: application/json" \
+  -d '{"repo_url":"https://github.com/pallets/click","branch":"main","limit":5,"github_token":null}'
+```
+
+> **GitHub Token Note**: Public repositories can be audited without a token subject to GitHub's standard IP rate limit (60 requests/hr). Providing a personal access token (via `GITHUB_TOKEN` in `.env` or in the request body) increases the rate limit to 5,000 requests/hr and enables auditing of private repositories. Tokens are never logged or stored.

@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { PlusCircle, Users, History, X } from 'lucide-react';
+import { PlusCircle, FolderGit2, Users, History, X } from 'lucide-react';
 import LogoMotion from './LogoMotion';
 import ThemeToggle from './ThemeToggle';
 import './Sidebar.css';
@@ -7,6 +7,7 @@ import './Sidebar.css';
 export default function Sidebar({ isOpen, onClose }) {
   const navItems = [
     { to: '/app', label: 'New trial', icon: PlusCircle, end: true },
+    { to: '/app/repo', label: 'Repo audit', icon: FolderGit2, end: false },
     { to: '/app/agents', label: 'Agents', icon: Users, end: false },
     { to: '/app/history', label: 'Case history', icon: History, end: false },
   ];

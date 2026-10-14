@@ -121,6 +121,28 @@
   flex-wrap: wrap;
 }
 
+.history-type-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+}
+
+.history-type-badge.repo {
+  background-color: var(--judge-soft);
+  color: var(--judge);
+  border: 1px solid var(--judge-border);
+}
+
+.history-type-badge.snippet {
+  background-color: var(--surface-subtle);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+}
+
 .meta-timestamp,
 .meta-duration {
   display: inline-flex;
