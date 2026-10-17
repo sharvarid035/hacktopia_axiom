@@ -3,8 +3,8 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 export const BACKEND_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
 
 // Preloaded demo repo URLs (placeholder constants user can click/replace)
-export const DEMO_REPO_URL = 'https://github.com/pallets/click';
-export const DEMO_REPO_URL_2 = 'https://github.com/psf/requests';
+export const DEMO_REPO_URL = 'https://github.com/dyuthialva/test-repo';
+export const DEMO_REPO_URL_2 = 'https://github.com/encode/starlette';
 
 const HISTORY_STORAGE_KEY = 'verdict_ai_case_history';
 

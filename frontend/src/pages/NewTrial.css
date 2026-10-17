@@ -22,7 +22,7 @@
   font-weight: 700;
   color: var(--text);
   line-height: 1.2;
-  margin-bottom: 8px;
+  margin: 0 0 8px 0;
 }
 
 .trial-subheading {

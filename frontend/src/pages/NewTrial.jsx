@@ -70,18 +70,15 @@ export default function NewTrial({ swarmState }) {
 
   return (
     <div className="new-trial-page">
-      {/* Top Header / Eyebrow */}
+      {/* Top Header */}
       <div className="trial-header-block">
-        <div className="eyebrow-pill">
-          <span>AI-ASSISTED CODE ADJUDICATION</span>
-        </div>
         <div className="trial-title-action-row">
           <div>
             <h1 className="trial-heading">
               Bring your code. <span className="headline-italic">We'll call the witnesses.</span>
             </h1>
             <p className="trial-subheading">
-              The Prosecutor uncovers bugs, the Defender challenges with edge cases, and the Judge verifies patches in an isolated sandbox.
+              Paste your buggy code and watch three AI agents argue over the fix.
             </p>
           </div>
 

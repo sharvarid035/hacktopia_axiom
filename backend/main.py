@@ -23,6 +23,19 @@ load_dotenv()
 app = FastAPI(title="Verdict AI API")
 
 
+@app.get("/")
+def root_redirect():
+    from fastapi.responses import HTMLResponse
+    return HTMLResponse(
+        """<html>
+        <head><meta http-equiv="refresh" content="0; url=http://127.0.0.1:5173/app/repo" /></head>
+        <body style="font-family:sans-serif; text-align:center; padding:50px;">
+            <h2>Verdict AI API Server is running!</h2>
+            <p>Redirecting to the frontend website: <a href="http://127.0.0.1:5173/app/repo">http://127.0.0.1:5173/app/repo</a>...</p>
+        </body></html>"""
+    )
+
+
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
@@ -422,6 +435,7 @@ async def run_judge_pipeline(
 async def swarm_debug_stream(request: CodeRequest):
     async def event_generator():
         original_code = request.code
+        test_cases_text = "None provided. Deduce intended behavior from original code."
         model_name = get_active_model()
         agent_config = types.GenerateContentConfig(
             temperature=0.3,

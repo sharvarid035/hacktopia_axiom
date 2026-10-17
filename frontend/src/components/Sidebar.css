@@ -44,11 +44,12 @@
 
 .brand-badge {
   font-size: 0.68rem;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  text-transform: none;
+  letter-spacing: 0.01em;
   margin-top: 2px;
+  white-space: nowrap;
 }
 
 .mobile-close-btn {

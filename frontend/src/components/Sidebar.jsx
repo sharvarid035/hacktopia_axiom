@@ -30,7 +30,7 @@ export default function Sidebar({ isOpen, onClose }) {
             <LogoMotion variant="mark-only" size="default" />
             <div className="brand-text-col">
               <span className="brand-name">Verdict AI</span>
-              <span className="brand-badge">Court v1.0</span>
+              <span className="brand-badge">Where bugs get a fair trial</span>
             </div>
           </NavLink>
 
